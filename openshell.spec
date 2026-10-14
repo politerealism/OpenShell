@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 %global crate openshell
-%global openshell_version 0.0.37
+
+# Run the Rust unit tests in %check. Disable with --without check.
+%bcond_without check
+%global openshell_version 0.1.4
 %global openshell_cargo_version %{openshell_version}
 # Python dist-info metadata intentionally follows the RPM Version. Dev build
 # identity is represented by Release for RPM packages.
@@ -10,7 +13,7 @@
 
 Name:           openshell
 Version:        %{openshell_version}
-Release:        1.20260518180028805757.podman.toml.gateway.listener.11.g8c0cb7c8%{?dist}
+Release:        %autorelease
 Summary:        Safe, sandboxed runtimes for autonomous AI agents
 
 # OpenShell's own code is Apache-2.0. The binaries statically link third-party
@@ -26,8 +29,14 @@ URL:            https://github.com/NVIDIA/OpenShell
 #Source0:        https://github.com/NVIDIA/OpenShell/archive/refs/tags/v%%{openshell_version}/%%{name}-%%{openshell_version}.tar.gz
 Source0:        openshell-%{openshell_version}.tar.gz
 # TODO: provide URL to the dist git location housing the vendor tarball
+# Source1 is a `cargo vendor` tarball with a top-level vendor/ directory. To
+# regenerate it from the Source0 tree:
+#   cargo vendor --locked && tar -cJf openshell-<version>-vendor.tar.xz vendor/
 Source1:        openshell-%{openshell_version}-vendor.tar.xz
 
+# Upstream only builds and tests x86_64 and aarch64. Other Fedora arches have
+# not been validated; TODO: build on ppc64le and s390x, and file a bug per arch
+# for any that fail (ExcludeArch) instead of listing arches here.
 ExclusiveArch:  x86_64 aarch64 noarch
 
 # Rust build dependencies for the from-source fallback used when
@@ -121,8 +130,8 @@ if [ -z "${OPENSHELL_PREBUILT_BINARIES_DIR:-}" ]; then
   # Use the distro protoc instead of the protoc-bin-vendored binary.
   export PROTOC=%{_bindir}/protoc
   export PROTOC_INCLUDE=%{_includedir}
-  cargo build --release --bin openshell --bin openshell-gateway --bin openshell-prover
-  OPENSHELL_PREBUILT_BINARIES_DIR="$PWD/target/release"
+  %cargo_build -- --bin openshell --bin openshell-gateway --bin openshell-prover
+  OPENSHELL_PREBUILT_BINARIES_DIR="$PWD/target/rpm"
 fi
 test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell"
 test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell-gateway"
@@ -140,7 +149,7 @@ pandoc -s -t man deploy/man/openshell.1.md -o openshell.1
 pandoc -s -t man deploy/man/openshell-gateway.8.md -o openshell-gateway.8
 
 %install
-OPENSHELL_PREBUILT_BINARIES_DIR="${OPENSHELL_PREBUILT_BINARIES_DIR:-$PWD/target/release}"
+OPENSHELL_PREBUILT_BINARIES_DIR="${OPENSHELL_PREBUILT_BINARIES_DIR:-$PWD/target/rpm}"
 
 # --- CLI binary ---
 install -Dpm 0755 "${OPENSHELL_PREBUILT_BINARIES_DIR}/%{name}" %{buildroot}%{_bindir}/%{name}
@@ -257,6 +266,13 @@ echo "rpm" > %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.
 touch %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info/RECORD
 
 %check
+%if %{with check}
+# Run the policy prover unit tests, which link the system Z3 (105 tests passed
+# against Fedora's z3-devel). The rest of the workspace tests are not run yet:
+# they have not been validated in an offline mock build.
+%cargo_test -- -p openshell-prover --lib
+%endif
+
 # Smoke-test the CLI binary
 %{buildroot}%{_bindir}/%{name} --version
 
