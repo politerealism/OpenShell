@@ -8,10 +8,6 @@
 # identity is represented by Release for RPM packages.
 %global openshell_python_version %{openshell_version}
 
-# Cargo/Rust builds with vendored deps do not produce debugsource listings
-# in the format redhat-rpm-config expects (especially on EPEL).
-%global debug_package %{nil}
-
 Name:           openshell
 Version:        %{openshell_version}
 Release:        1.20260518180028805757.podman.toml.gateway.listener.11.g8c0cb7c8%{?dist}
@@ -26,10 +22,13 @@ Summary:        Safe, sandboxed runtimes for autonomous AI agents
 # generated from this spec. Re-check when Cargo.lock changes.
 License:        Apache-2.0 AND BSD-3-Clause AND CC0-1.0 AND CDLA-Permissive-2.0 AND ISC AND MIT AND Unicode-3.0 AND Zlib
 URL:            https://github.com/NVIDIA/OpenShell
-Source0: openshell-%{openshell_version}.tar.gz
-Source1: openshell-%{openshell_version}-vendor.tar.xz
+# TODO: Switch to the URL when patches are upstreamed
+#Source0:        https://github.com/NVIDIA/OpenShell/archive/refs/tags/v%%{openshell_version}/%%{name}-%%{openshell_version}.tar.gz
+Source0:        openshell-%{openshell_version}.tar.gz
+# TODO: provide URL to the dist git location housing the vendor tarball
+Source1:        openshell-%{openshell_version}-vendor.tar.xz
 
-ExclusiveArch:  x86_64 aarch64
+ExclusiveArch:  x86_64 aarch64 noarch
 
 # Rust build dependencies for the from-source fallback used when
 # OPENSHELL_PREBUILT_BINARIES_DIR is not set (COPR/Koji style builds).
@@ -89,6 +88,7 @@ within an operator-supplied maximum without connecting to a gateway.
 Summary:        OpenShell Python SDK for agent execution and management
 # Pure Python; links none of the crates covered by the main License tag.
 License:        Apache-2.0
+BuildArch:      noarch
 # Use Recommends instead of Requires because Fedora 43+ ships older
 # versions of grpcio (1.48) and protobuf (3.19) than the SDK needs.
 # Users on distros with older packages can install these via pip/uv.
@@ -152,7 +152,7 @@ install -Dpm 0755 "${OPENSHELL_PREBUILT_BINARIES_DIR}/%{name}-prover" %{buildroo
 install -Dpm 0755 "${OPENSHELL_PREBUILT_BINARIES_DIR}/%{name}-gateway" %{buildroot}%{_bindir}/%{name}-gateway
 
 # --- Default gateway TOML config template ---
-# Shipped as a read-only reference in %{_datadir}. The systemd unit seeds a
+# Shipped as a read-only reference in %%{_datadir}. The systemd unit seeds a
 # user-level copy at ~/.config/openshell/gateway.toml on first start.
 install -Dpm 0644 deploy/rpm/gateway.toml.default %{buildroot}%{_datadir}/%{name}-gateway/gateway.toml.default
 install -Dpm 0644 deploy/rpm/gateway.toml.default.v1 %{buildroot}%{_datadir}/%{name}-gateway/gateway.toml.default.v1
