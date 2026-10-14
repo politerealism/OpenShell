@@ -3,6 +3,11 @@
 
 %global crate openshell
 
+# The debugsource package carries the vendored crate sources. brp-mangle-shebangs
+# mistakes Rust inner attributes such as #![allow(...)] at the top of those files
+# for malformed shebang lines and fails the build, so skip /usr/src/debug.
+%global __brp_mangle_shebangs_exclude_from ^/usr/src/debug/.*$
+
 # Run the Rust unit tests in %check. Disable with --without check.
 %bcond_without check
 %global openshell_version 0.1.4
