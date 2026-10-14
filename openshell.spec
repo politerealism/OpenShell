@@ -31,8 +31,19 @@ Source1: openshell-%{openshell_version}-vendor.tar.xz
 
 ExclusiveArch:  x86_64 aarch64
 
-# Cargo metadata generation
+# Rust build dependencies for the from-source fallback used when
+# OPENSHELL_PREBUILT_BINARIES_DIR is not set (COPR/Koji style builds).
+BuildRequires:  rust
 BuildRequires:  cargo
+BuildRequires:  gcc
+BuildRequires:  gcc-c++
+BuildRequires:  make
+BuildRequires:  cmake
+BuildRequires:  pkgconfig
+BuildRequires:  clang-devel
+BuildRequires:  z3-devel
+BuildRequires:  protobuf-compiler
+BuildRequires:  protobuf-devel
 BuildRequires:  cargo-rpm-macros >= 25
 BuildRequires:  systemd-rpm-macros
 
@@ -104,6 +115,15 @@ sed -i 's/^version = "0.0.0"/version = "%{openshell_cargo_version}"/' Cargo.toml
 grep -q 'version = "%{openshell_cargo_version}"' Cargo.toml || (echo "ERROR: Cargo.toml version patch failed" && exit 1)
 
 %build
+# Build from source unless the release workflow supplied prebuilt binaries.
+if [ -z "${OPENSHELL_PREBUILT_BINARIES_DIR:-}" ]; then
+  export CARGO_BUILD_JOBS=%{_smp_build_ncpus}
+  # Use the distro protoc instead of the protoc-bin-vendored binary.
+  export PROTOC=%{_bindir}/protoc
+  export PROTOC_INCLUDE=%{_includedir}
+  cargo build --release --bin openshell --bin openshell-gateway --bin openshell-prover
+  OPENSHELL_PREBUILT_BINARIES_DIR="$PWD/target/release"
+fi
 test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell"
 test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell-gateway"
 test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell-prover"
@@ -120,6 +140,8 @@ pandoc -s -t man deploy/man/openshell.1.md -o openshell.1
 pandoc -s -t man deploy/man/openshell-gateway.8.md -o openshell-gateway.8
 
 %install
+OPENSHELL_PREBUILT_BINARIES_DIR="${OPENSHELL_PREBUILT_BINARIES_DIR:-$PWD/target/release}"
+
 # --- CLI binary ---
 install -Dpm 0755 "${OPENSHELL_PREBUILT_BINARIES_DIR}/%{name}" %{buildroot}%{_bindir}/%{name}
 
