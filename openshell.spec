@@ -27,7 +27,7 @@
 Name:           openshell
 Version:        %{openshell_version}
 Release:        %autorelease
-Summary:        Safe, sandboxed runtimes for autonomous AI agents
+Summary:        Safe sandbox runtimes for autonomous AI agents
 
 # OpenShell's own code is Apache-2.0. The binaries statically link third-party
 # crates; this is the minimal SPDX expression covering every crate linked into
@@ -79,9 +79,9 @@ BuildRequires:  python3-devel
 Recommends:     podman
 
 %description
-OpenShell provides safe, sandboxed runtimes for autonomous AI agents.
-It offers a CLI for managing gateway registrations, sandboxes, and providers with
-policy-enforced egress routing, credential proxying, and privacy-aware
+OpenShell provides safe sandbox runtimes for autonomous AI agents. It offers
+a CLI for managing gateway registrations, sandboxes, and providers, with
+policy-enforced egress routing, a credential proxy, and privacy-aware
 profile-backed model-provider access.
 
 # --- Gateway sub-package ---
@@ -92,8 +92,8 @@ Requires:       openssl
 Requires:       %{name} = %{version}-%{release}
 
 %description gateway
-OpenShell gateway server providing the control-plane API for sandbox
-lifecycle management. This package installs Podman-oriented defaults in
+OpenShell gateway server providing the control-plane API for managing the
+life cycle of sandboxes. This package installs Podman-oriented defaults in
 gateway TOML while leaving compute driver selection to gateway auto-detection
 or explicit operator configuration.
 
