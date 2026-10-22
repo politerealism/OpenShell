@@ -88,7 +88,6 @@ profile-backed model-provider access.
 %package gateway
 Summary:        OpenShell gateway server with Podman sandbox driver
 Requires:       podman
-Requires:       openssl
 Requires:       %{name} = %{version}-%{release}
 
 %description gateway
