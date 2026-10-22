@@ -10,6 +10,14 @@
 
 # Run the Rust unit tests in %check. Disable with --without check.
 %bcond_without check
+
+# The SDK's hand-written dist-info METADATA declares grpcio >= 1.60 and
+# protobuf >= 4.25. The Python dependency generator would turn those into hard
+# Requires, but Fedora ships older versions (grpcio 1.48, protobuf 3.19), which
+# makes python3-openshell uninstallable. The SDK works with the Fedora versions,
+# so turn the requires generator off and use the Recommends below instead.
+%{?python_disable_dependency_generator}
+
 %global openshell_version 0.1.4
 %global openshell_cargo_version %{openshell_version}
 # Python dist-info metadata intentionally follows the RPM Version. Dev build
