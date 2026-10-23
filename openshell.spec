@@ -18,7 +18,7 @@
 # so turn the requires generator off and use the Recommends below instead.
 %{?python_disable_dependency_generator}
 
-%global openshell_version 0.1.4
+%global openshell_version 0.1.5
 %global openshell_cargo_version %{openshell_version}
 # Python dist-info metadata intentionally follows the RPM Version. Dev build
 # identity is represented by Release for RPM packages.
