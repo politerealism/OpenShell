@@ -28,7 +28,14 @@ Summary:        Safe sandbox runtimes for autonomous AI agents
 # license metadata, treating "X OR MIT" as satisfied by MIT or Apache-2.0).
 # The docs, man page sources, config templates and Python SDK sources carry
 # Apache-2.0 SPDX headers or fall under the repository LICENSE. The unit file is
-# generated from this spec. Re-check when Cargo.lock changes.
+# generated from this spec. Re-check when Cargo.lock changes. The tag was
+# re-checked against the %%cargo_license_summary output of a 0.1.4 build: every
+# expression is satisfiable using only these identifiers.
+#
+# TLS uses rustls with the aws-lc-rs / aws-lc-sys crates, statically linked from
+# the vendored sources (symbols are prefixed, so nothing collides with system
+# OpenSSL). FESCo ticket 3679 allows aws-lc through these crates for TLS via
+# Rustls. Rustls cannot read the system crypto policies.
 License:        Apache-2.0 AND BSD-3-Clause AND CC0-1.0 AND CDLA-Permissive-2.0 AND ISC AND MIT AND Unicode-3.0 AND Zlib
 URL:            https://github.com/NVIDIA/OpenShell
 # TODO: Switch to the URL when patches are upstreamed
@@ -123,7 +130,9 @@ management, agent execution, and provider access through the gateway API.
 tar xf %{SOURCE1}
 %cargo_prep -v vendor
 
-# Patch workspace version from placeholder to actual build identity.
+# Fedora-specific: upstream keeps the workspace version at the placeholder 0.0.0
+# and stamps it at release time (see crates/openshell-core/build.rs), so patch it
+# to the package version. Not upstreamable.
 sed -i 's/^version = "0.0.0"/version = "%{openshell_cargo_version}"/' Cargo.toml
 grep -q 'version = "%{openshell_cargo_version}"' Cargo.toml || (echo "ERROR: Cargo.toml version patch failed" && exit 1)
 
@@ -182,7 +191,7 @@ install -d %{buildroot}%{_userunitdir}
 cat > %{buildroot}%{_userunitdir}/%{name}-gateway.service << 'EOF'
 [Unit]
 Description=OpenShell Gateway (user)
-Documentation=https://github.com/NVIDIA/OpenShell
+Documentation=man:openshell-gateway(8) file://%{_docdir}/%{name}-gateway/QUICKSTART.md https://github.com/NVIDIA/OpenShell
 After=podman.socket
 Wants=podman.socket
 
@@ -196,23 +205,23 @@ Type=exec
 # Seed a default TOML config on first start. On upgrade, replace only the exact
 # schema-v1 config previously seeded by this package; preserve edited files.
 # %%E expands to $XDG_CONFIG_HOME (~/.config) in user units.
-ExecStartPre=%{_libexecdir}/%{name}-gateway-migrate-config %%E/openshell/gateway.toml /usr/share/openshell-gateway/gateway.toml.default /usr/share/openshell-gateway/gateway.toml.default.v1
+ExecStartPre=%{_libexecdir}/%{name}-gateway-migrate-config %%E/openshell/gateway.toml %{_datadir}/%{name}-gateway/gateway.toml.default %{_datadir}/%{name}-gateway/gateway.toml.default.v1
 
 # Reject an invalid selected configuration before generating certificates or
 # starting the gateway. The environment file below applies to every command.
-ExecStartPre=/usr/bin/openshell-gateway config preflight
+ExecStartPre=%{_bindir}/%{name}-gateway config preflight
 
 # Auto-generate PKI on first start if not present.
 # The default local TLS dir uses %%h because %%S resolves differently across
 # systemd user-manager versions. gateway.env may override this path.
 Environment=OPENSHELL_LOCAL_TLS_DIR=%%h/.local/state/openshell/tls
-ExecStartPre=/usr/bin/openshell-gateway generate-certs --output-dir ${OPENSHELL_LOCAL_TLS_DIR} --server-san host.openshell.internal
+ExecStartPre=%{_bindir}/%{name}-gateway generate-certs --output-dir ${OPENSHELL_LOCAL_TLS_DIR} --server-san host.openshell.internal
 
 # gateway.env is honored for backward compatibility with pre-1415 installs.
 # New installs use runtime defaults; create gateway.toml to override.
 # See TROUBLESHOOTING.md for the env-to-TOML migration guide.
 EnvironmentFile=-%%E/openshell/gateway.env
-ExecStart=/usr/bin/openshell-gateway
+ExecStart=%{_bindir}/%{name}-gateway
 StateDirectory=openshell
 Restart=on-failure
 RestartSec=5
@@ -226,12 +235,7 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 [Install]
 WantedBy=default.target
 EOF
-
-# --- Gateway documentation ---
-install -d %{buildroot}%{_docdir}/%{name}-gateway
-install -pm 0644 deploy/rpm/QUICKSTART.md %{buildroot}%{_docdir}/%{name}-gateway/QUICKSTART.md
-install -pm 0644 deploy/rpm/CONFIGURATION.md %{buildroot}%{_docdir}/%{name}-gateway/CONFIGURATION.md
-install -pm 0644 deploy/rpm/TROUBLESHOOTING.md %{buildroot}%{_docdir}/%{name}-gateway/TROUBLESHOOTING.md
+chmod 0644 %{buildroot}%{_userunitdir}/%{name}-gateway.service
 
 # --- Man pages ---
 install -Dpm 0644 openshell.1 %{buildroot}%{_mandir}/man1/openshell.1
@@ -277,9 +281,9 @@ echo "rpm" > %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.
 
 %check
 %if %{with check}
-# Run the policy prover unit tests, which link the system Z3 (105 tests passed
+# Run the policy prover unit tests, which link the system Z3 (106 tests pass
 # against Fedora's z3-devel). The rest of the workspace tests are not run yet:
-# they have not been validated in an offline mock build.
+# they have not been reviewed for network and container-runtime requirements.
 %cargo_test -- -p openshell-prover --lib
 %endif
 
@@ -363,12 +367,13 @@ grep -q 'gateway.toml.default.v1' %{buildroot}%{_userunitdir}/%{name}-gateway.se
 %license LICENSE
 %license LICENSE.dependencies
 %license cargo-vendor.txt
-%doc %{_docdir}/%{name}-gateway/QUICKSTART.md
-%doc %{_docdir}/%{name}-gateway/CONFIGURATION.md
-%doc %{_docdir}/%{name}-gateway/TROUBLESHOOTING.md
+%doc deploy/rpm/QUICKSTART.md
+%doc deploy/rpm/CONFIGURATION.md
+%doc deploy/rpm/TROUBLESHOOTING.md
 %{_bindir}/%{name}-gateway
 %{_userunitdir}/%{name}-gateway.service
 %{_libexecdir}/%{name}-gateway-migrate-config
+%dir %{_datadir}/%{name}-gateway
 %{_datadir}/%{name}-gateway/gateway.toml.default
 %{_datadir}/%{name}-gateway/gateway.toml.default.v1
 %{_mandir}/man8/openshell-gateway.8*
