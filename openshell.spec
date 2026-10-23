@@ -71,8 +71,10 @@ BuildRequires:  systemd-rpm-macros
 # Man page generation
 BuildRequires:  pandoc
 
-# Python sub-package build dependencies
+# Python sub-package build dependencies. grpcio-tools generates the protobuf
+# stubs, which upstream does not commit.
 BuildRequires:  python3-devel
+BuildRequires:  python3-grpcio-tools
 
 # Runtime: container runtime for package-managed gateway sandboxes.
 # The gateway auto-detects Podman when the package-managed service starts.
@@ -155,6 +157,10 @@ test -x "${OPENSHELL_PREBUILT_BINARIES_DIR}/openshell-prover"
 %cargo_vendor_manifest
 %{cargo_license_summary}
 %{cargo_license} > LICENSE.dependencies
+
+# Generate the Python protobuf stubs (upstream gitignores them). Fedora's
+# grpcio-tools is 1.48, whose protoc has no --pyi_out, so skip the .pyi files.
+%{python3} tasks/scripts/generate_python_proto.py --no-pyi
 
 # Build man pages from markdown
 pandoc -s -t man deploy/man/openshell.1.md -o openshell.1
@@ -298,18 +304,28 @@ echo "rpm" > %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.
 PYTHONPATH=%{buildroot}%{python3_sitelib} %{python3} -c "from importlib.metadata import version; v = version('openshell'); print(v); assert v == '%{openshell_python_version}', f'expected %{openshell_python_version}, got {v}'"
 
 # Verify every module the installed SDK pulls in with a relative import was
-# installed. Importing the package needs grpcio, which the build environment
-# does not have, so check the imports statically.
+# installed, including the generated protobuf stubs imported with
+# "from ._proto import x_pb2". Importing the package needs grpcio, which the
+# build environment does not have, so check the imports statically.
 %{python3} - %{buildroot}%{python3_sitelib}/%{name} <<'PY'
 import ast, pathlib, sys
 pkg = pathlib.Path(sys.argv[1])
 missing = []
+def exists(path):
+    return path.with_suffix(".py").exists() or (path / "__init__.py").exists()
 for source in pkg.glob("*.py"):
     for node in ast.walk(ast.parse(source.read_text())):
-        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
-            base = pkg.joinpath(*node.module.split("."))
-            if not (base.with_suffix(".py").exists() or (base / "__init__.py").exists()):
-                missing.append(f"{source.name}: .{node.module}")
+        if not (isinstance(node, ast.ImportFrom) and node.level == 1 and node.module):
+            continue
+        base = pkg.joinpath(*node.module.split("."))
+        if not exists(base):
+            missing.append(f"{source.name}: .{node.module}")
+            continue
+        if base.is_dir():
+            init = (base / "__init__.py").read_text()
+            for alias in node.names:
+                if alias.name != "*" and alias.name not in init and not exists(base / alias.name):
+                    missing.append(f"{source.name}: .{node.module}.{alias.name}")
 assert not missing, f"installed SDK imports modules that were not installed: {missing}"
 PY
 
