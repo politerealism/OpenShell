@@ -11,13 +11,6 @@
 # Run the Rust unit tests in %check. Disable with --without check.
 %bcond_without check
 
-# The SDK's hand-written dist-info METADATA declares grpcio >= 1.60 and
-# protobuf >= 4.25. The Python dependency generator would turn those into hard
-# Requires, but Fedora ships older versions (grpcio 1.48, protobuf 3.19), which
-# makes python3-openshell uninstallable. The SDK works with the Fedora versions,
-# so turn the requires generator off and use the Recommends below instead.
-%{?python_disable_dependency_generator}
-
 %global openshell_version 0.1.5
 %global openshell_cargo_version %{openshell_version}
 # Python dist-info metadata intentionally follows the RPM Version. Dev build
@@ -112,14 +105,8 @@ Summary:        OpenShell Python SDK for agent execution and management
 # Pure Python; links none of the crates covered by the main License tag.
 License:        Apache-2.0
 BuildArch:      noarch
-# Use Recommends instead of Requires because Fedora 43+ ships older
-# versions of grpcio (1.48) and protobuf (3.19) than the SDK needs.
-# Users on distros with older packages can install these via pip/uv.
-Recommends:     python3-cloudpickle >= 3.0
-Recommends:     python3-googleapis-common-protos >= 1.63
-Recommends:     python3-grpcio >= 1.60
-Recommends:     python3-httpx >= 0.27
-Recommends:     python3-protobuf >= 4.25
+# Runtime dependencies come from the dist-info METADATA through the Python
+# dependency generator.
 Recommends:     %{name}
 
 %description -n python3-%{name}
@@ -261,7 +248,12 @@ install -pm 0644 python/%{name}/py.typed %{buildroot}%{python3_sitelib}/%{name}/
 install -pm 0644 python/%{name}/_proto/__init__.py %{buildroot}%{python3_sitelib}/%{name}/_proto/
 install -pm 0644 python/%{name}/_proto/*.py %{buildroot}%{python3_sitelib}/%{name}/_proto/
 
-# Create dist-info so importlib.metadata can resolve the package version
+# Create dist-info so importlib.metadata resolves the package version and the
+# dependency generator emits the runtime requirements. Upstream declares
+# grpcio >= 1.60 and protobuf >= 4.25, which Fedora cannot satisfy (grpcio 1.48,
+# protobuf 3.19), so those two are left unversioned here. The SDK imports and
+# runs against the Fedora versions (stubs generated with grpcio-tools 1.48, and
+# a live-gateway test on Fedora 44 passed).
 install -d %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info
 cat > %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info/METADATA << EOF
 Metadata-Version: 2.1
@@ -269,12 +261,12 @@ Name: %{name}
 Version: %{openshell_python_version}
 Summary: OpenShell Python SDK for agent execution and management
 License: Apache-2.0
-Requires-Python: >=3.12
+Requires-Python: >=3.11
 Requires-Dist: cloudpickle>=3.0
 Requires-Dist: googleapis-common-protos>=1.63
-Requires-Dist: grpcio>=1.60
+Requires-Dist: grpcio
 Requires-Dist: httpx>=0.27
-Requires-Dist: protobuf>=4.25
+Requires-Dist: protobuf
 EOF
 
 # INSTALLER marker per PEP 376
