@@ -54,8 +54,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  make
 BuildRequires:  cmake
 BuildRequires:  pkgconfig
-BuildRequires:  clang-devel
-BuildRequires:  z3-devel
+BuildRequires:  pkgconfig(z3)
 BuildRequires:  protobuf-compiler
 BuildRequires:  protobuf-devel
 BuildRequires:  cargo-rpm-macros >= 25
