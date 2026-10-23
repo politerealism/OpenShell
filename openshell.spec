@@ -122,7 +122,7 @@ Recommends:     %{name}
 
 %description -n python3-%{name}
 Python SDK for OpenShell providing programmatic access to sandbox
-management, agent execution, and provider access via gRPC.
+management, agent execution, and provider access through the gateway API.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -274,9 +274,6 @@ EOF
 # INSTALLER marker per PEP 376
 echo "rpm" > %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info/INSTALLER
 
-# RECORD can be empty for RPM-managed installs
-touch %{buildroot}%{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info/RECORD
-
 %check
 %if %{with check}
 # Run the policy prover unit tests, which link the system Z3 (105 tests passed
@@ -348,6 +345,7 @@ grep -q 'gateway.toml.default.v1' %{buildroot}%{_userunitdir}/%{name}-gateway.se
 %license LICENSE
 %license LICENSE.dependencies
 %license cargo-vendor.txt
+%doc README.md
 %{_bindir}/%{name}-prover
 
 %files gateway
@@ -366,6 +364,7 @@ grep -q 'gateway.toml.default.v1' %{buildroot}%{_userunitdir}/%{name}-gateway.se
 
 %files -n python3-%{name}
 %license LICENSE
+%doc README.md
 %{python3_sitelib}/%{name}/
 %{python3_sitelib}/%{name}-%{openshell_python_version}.dist-info/
 
