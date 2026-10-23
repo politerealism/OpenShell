@@ -72,6 +72,10 @@ BuildRequires:  python3-grpcio-tools
 # Runtime: container runtime for package-managed gateway sandboxes.
 # The gateway auto-detects Podman when the package-managed service starts.
 Recommends:     podman
+# The CLI runs ssh for sandbox connect and exec, and git for git-aware uploads.
+Requires:       openssh-clients
+Recommends:     git-core
+Suggests:       lsof
 
 %description
 OpenShell provides safe sandbox runtimes for autonomous AI agents. It offers
@@ -83,7 +87,7 @@ profile-backed model-provider access.
 %package gateway
 Summary:        OpenShell gateway server with Podman sandbox driver
 Requires:       podman
-Requires:       %{name} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %description gateway
 OpenShell gateway server providing the control-plane API for managing the
